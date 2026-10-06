@@ -1,5 +1,7 @@
 # archetypeai-swat-demo-nemotron
 
+![SWaT dashboard: Omega flags P1–P3 as attack; NVIDIA Nemotron suggests upstream / local / downstream operator actions](images/swat-nemotron-dashboard.png)
+
 SWaT water-treatment demo pairing **Archetype AI Newton Omega** with **NVIDIA Nemotron**:
 
 - **Sensing — Newton Omega** (Archetype Direct Query API, `OmegaEncoder::omega_embeddings_1_4`): per-channel embeddings + local KNN classify each of the six stages as normal / attack in real time.
