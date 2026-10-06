@@ -7,7 +7,11 @@ SWaT water-treatment demo pairing **Archetype AI Newton Omega** with **NVIDIA Ne
 - **Sensing — Newton Omega** (Archetype Direct Query API, `OmegaEncoder::omega_embeddings_1_4`): per-channel embeddings + local KNN classify each of the six stages as normal / attack in real time.
 - **Reasoning — NVIDIA Nemotron** (NVIDIA hosted API, `integrate.api.nvidia.com`, default `nvidia/nemotron-3-super-120b-a12b`): when stages flag, Nemotron gets the stage states plus live sensor values vs. baseline and returns topology-checked upstream / local / downstream operator suggestions.
 
-Forked from [`newton-swat-demo-direct-query`](https://github.com/archetypeai/archetypeai-swat-demo-direct-query); the only functional change is that `/api/suggestions` calls Nemotron (`src/lib/server/nemotron.js`) instead of Newton C 2.6. All model calls are server-side — no API key reaches the browser.
+Forked from [`archetypeai-swat-demo-direct-query`](https://github.com/archetypeai/archetypeai-swat-demo-direct-query). Classification is unchanged; what changed is the reasoning step:
+
+- `/api/suggestions` calls Nemotron (`src/lib/server/nemotron.js`) instead of Newton C 2.6.
+- Every model call is server-side. The parent's browser-direct suggestions path (which sent the Archetype API key to the browser via `/api/baselines`) is removed.
+- Nemotron gets every stage's equipment list, and upstream/downstream cards that name the anomalous stage's own valves or pumps are dropped (see [Phase 3](#phase-3--reason-suggested-actions-via-nvidia-nemotron)).
 
 ## Concept
 
@@ -24,13 +28,17 @@ Six per-stage classifiers, each trained on its own sensor subset (n-shot normal 
 
 ## Stack
 
-Svelte 5 + SvelteKit · Tailwind v4 · `@archetypeai/ds-lib-tokens` · bits-ui · layerchart · `umap-js` (server-side projection fit) · `plotly.js-dist-min` (client-side scatters).
+Svelte 5 + SvelteKit · Tailwind v4 · `@archetypeai/ds-lib-tokens` · bits-ui · layerchart · `umap-js` (server-side projection fit) · `plotly.js-dist-min` (client-side scatters) · NVIDIA hosted API for Nemotron (plain `fetch`, no SDK).
 
 ## Setup
 
 ```bash
 cp .env.example .env
-# edit .env: ATAI_API_KEY, ATAI_API_ENDPOINT, NVIDIA_API_KEY (nvapi-..., from build.nvidia.com)
+# edit .env: ATAI_API_KEY, ATAI_API_ENDPOINT, NVIDIA_API_KEY
+# NVIDIA_API_KEY: create one at https://build.nvidia.com/settings/api-keys (free
+# NVIDIA Developer Program). An NGC key used for pulling containers also starts with
+# nvapi- but gets 403 on the hosted models.
+# Optional: NEMOTRON_MODEL (default nvidia/nemotron-3-super-120b-a12b), NVIDIA_API_ENDPOINT.
 
 npm install
 
@@ -54,7 +62,7 @@ npm run dev
 
 Open the dev URL, press **Start analysis** (instant — no session warmup), then **Play** to replay the SWaT timeline at 10× real time and watch classifications stream in.
 
-## How the demo interacts with Newton
+## How the demo interacts with Newton and Nemotron
 
 Three flows: **build** (offline, one-time), **classify** (per playback window), **reason** (when anomalies change).
 
@@ -136,9 +144,26 @@ Browser tick loop                  SvelteKit /api/classify        Newton /query
 
 No session lifecycle. Each tick is a single round-trip to `/api/classify` that fans out to six parallel `/query` calls inside the server. End-to-end latency ~1.5–2 s for all six stages.
 
-### Phase 3 — Reason (Suggested Actions via Newton `/query`)
+### Phase 3 — Reason (Suggested Actions via NVIDIA Nemotron)
 
-Whenever the set of anomalous stages changes, the browser POSTs a structured plant-state snapshot to `/api/suggestions` (`src/routes/api/suggestions/+server.js`), which calls **NVIDIA Nemotron** server-side (`src/lib/server/nemotron.js`, OpenAI-style `/chat/completions`, reasoning off) and returns JSON cards routed to the correct upstream/local/downstream neighbour. Cards whose target breaks the plant topology are dropped.
+Whenever the set of anomalous stages changes, the browser POSTs a structured plant-state snapshot to `/api/suggestions` (`src/routes/api/suggestions/+server.js`), which calls **NVIDIA Nemotron** server-side (`src/lib/server/nemotron.js`) and returns JSON cards routed to the correct upstream/local/downstream neighbour.
+
+```
+Browser                    SvelteKit /api/suggestions               NVIDIA integrate.api.nvidia.com
+   │  { stageStatuses,            │                                          │
+   │    stageSensors } ──────────▶│  cache hit on anomaly signature? ──▶ return
+   │                              │  prompt = stage states + attack-stage    │
+   │                              │    sensors vs. normal baseline           │
+   │                              │    + equipment by stage                  │
+   │                              │  POST /v1/chat/completions ─────────────▶│
+   │                              │◀──── JSON array of cards ────────────────│
+   │                              │  drop cards that fail topology or name   │
+   │◀──── { suggestions, source } │    the anomalous stage's valves/pumps    │
+```
+
+- **Request:** `model: nvidia/nemotron-3-super-120b-a12b`, `temperature: 0.2`, and `chat_template_kwargs: { enable_thinking: false }` to turn off Nemotron 3's reasoning trace (`/no_think` in the prompt is ignored by Nemotron 3). About 1.5 s for a new anomaly set.
+- **Cache:** results are cached in memory per anomaly signature (e.g. `P2,P3`), so a repeat of the same set returns instantly with `source: nemotron-cached`.
+- **Validation:** each card's (origin, direction) must map to the expected target stage, and an upstream/downstream card may cite the anomalous stage's readings as evidence but not tell the operator to act on its valves (`MV…`) or pumps (`P…`) — those belong on the local card.
 
 ### Inside the Omega Direct Query call
 
@@ -158,12 +183,12 @@ Per the Omega skill's recommended convention, each window is embedded **one requ
 }
 ```
 
-The app uses two models against the `/query` endpoint:
+The app uses two models:
 
-- **`OmegaEncoder::omega_embeddings_1_4`** for per-window classification embeddings. Picked over `omega_embeddings_01` after a side-by-side leave-one-out comparison: P1 93→98%, P3 93→97%, no regressions on the other stages.
+- **`OmegaEncoder::omega_embeddings_1_4`** on Archetype's `/query` endpoint for per-window classification embeddings. Picked over `omega_embeddings_01` after a side-by-side leave-one-out comparison: P1 93→98%, P3 93→97%, no regressions on the other stages.
 - **NVIDIA Nemotron** (`NEMOTRON_MODEL`, default `nvidia/nemotron-3-super-120b-a12b`) via `https://integrate.api.nvidia.com/v1` — for operator-suggestion JSON.
 
-Two helper scripts in `scripts/` let you re-run those comparisons on your own setup: `compare_omega_models.py` (the Omega encoder pair) and `compare-newton-models.js` (the Newton C pair on the actual suggestions prompt).
+`scripts/compare_omega_models.py` re-runs the Omega encoder comparison on your own setup. (`scripts/compare-newton-models.js` is inherited from the parent repo and compares Newton C checkpoints on the suggestions prompt; it doesn't cover Nemotron.)
 
 Response — a single-channel request returns its 768-d vector **flat**:
 
@@ -270,4 +295,6 @@ window   normal (FP)   early-attack recall
 
 - Anomaly labels in SWaT are plant-wide, not per-stage. Each per-stage classifier is a best-effort inference based on *that stage's own sensors* — we're explicitly *not* looking at labels to decide which stage saw the attack.
 - The Suggested Actions panel is strictly Reason-layer: it surfaces operator guidance, never takes control actions. For any real deployment, actuation would require a separate safety-reviewed control path.
-- UMAP with 30 library points is a low-data regime; the layout is suggestive of structure but not precise. If you want sharper UMAP, increase the library by pre-embedding a chunk of inference data and including it in the fit set.
+- Nemotron's wording can still be wrong in ways the validation can't catch (e.g. reading a low differential pressure as "membrane fouling"). The cards cite the numbers they're based on so the operator can check them.
+- NVIDIA's free tier is rate-limited (about 40 requests/minute) and meant for development; the cache keeps the demo far below that. Hosted models are also retired on a schedule — `nvidia-nemotron-nano-9b-v2` was retired on 2026-08-26 — so check the catalog if the default starts returning 410.
+- UMAP with 188 library points per stage is a low-data regime; the layout is suggestive of structure but not precise. If you want sharper UMAP, increase the library by pre-embedding a chunk of inference data and including it in the fit set.
