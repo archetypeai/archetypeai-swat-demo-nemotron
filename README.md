@@ -181,7 +181,7 @@ The per-channel vectors are concatenated in channel order into one `[num_channel
 
 Collapsed by default — click "Omega embeddings · 6-stage 2D projection" at the bottom to expand. Six small scatters, one per stage. Mode toggle: **PCA** vs **UMAP**.
 
-![UMAP view of the embedding panel](images/swat-direct-query-umap.png)
+![Dashboard with the embedding panel expanded: per-stage PCA scatters of Omega embeddings with LOO badges, under the live plant view and Nemotron suggested actions](images/swat-nemotron-embedding-panel.png)
 
 Three layers per scatter:
 
