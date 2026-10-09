@@ -128,7 +128,10 @@ async function postQuery(body, timeoutMs = OMEGA_TIMEOUT_MS) {
 			const err = await res.text();
 			throw new Error(`/query failed: ${res.status} ${err.slice(0, 300)}`);
 		}
-		return res.json();
+		// Await the body inside the try: a bare `return res.json()` runs `finally` (clearing the
+		// timeout) as soon as headers arrive, so a stalled body hangs forever and holds an
+		// Omega pool slot — enough of those and every classify request queues indefinitely.
+		return await res.json();
 	} finally {
 		clearTimeout(t);
 	}
