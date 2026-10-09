@@ -95,6 +95,8 @@
 	let suggestionSignature = $state('');
 	let suggestionDebounce = null;
 	let suggestionFetchInFlight = false;
+	// Reasoning model for Suggested Actions: NVIDIA Nemotron (default) or Newton C 2.6.
+	let reasoningModel = $state('nemotron');
 
 	let effectiveStatuses = $derived.by(() => {
 		const out = { ...stageStatuses };
@@ -253,10 +255,25 @@
 			.join(',');
 	});
 
+	// What the current cards were generated for: model + anomaly set.
+	let suggestionKey = $derived(anomalySignature ? `${reasoningModel}:${anomalySignature}` : '');
+
+	function handleModelChange(model) {
+		if (!model || model === reasoningModel) return;
+		reasoningModel = model;
+		aiSuggestions = null; // don't show the other model's cards under this model's label
+		if (suggestionDebounce) {
+			clearTimeout(suggestionDebounce);
+			suggestionDebounce = null;
+		}
+		if (anomalySignature) runSuggestionsFetch();
+	}
+
 	async function runSuggestionsFetch() {
 		if (suggestionFetchInFlight) return;
-		const sig = anomalySignature;
-		if (!sig) return;
+		const key = suggestionKey;
+		const model = reasoningModel;
+		if (!anomalySignature) return;
 		suggestionFetchInFlight = true;
 		suggestionSource = 'loading';
 
@@ -276,20 +293,20 @@
 
 		try {
 			const result = await Promise.race([
-				fetchSuggestions(effectiveStatuses, stageSensors),
+				fetchSuggestions(effectiveStatuses, stageSensors, model),
 				timeoutPromise
 			]);
 			aiSuggestions = result.suggestions ?? [];
 			suggestionSource = result.source ?? 'error';
-			suggestionSignature = result.signature ?? sig;
+			suggestionSignature = key;
 		} catch (err) {
 			console.error('[suggestions] failed:', err);
 			aiSuggestions = [];
 			suggestionSource = 'error';
-			suggestionSignature = sig;
+			suggestionSignature = key;
 		} finally {
 			suggestionFetchInFlight = false;
-			if (anomalySignature && anomalySignature !== suggestionSignature) {
+			if (suggestionKey && suggestionKey !== suggestionSignature) {
 				runSuggestionsFetch();
 			}
 		}
@@ -297,17 +314,18 @@
 
 	$effect(() => {
 		const sig = anomalySignature;
+		const key = suggestionKey;
 		if (!sig) {
 			if (suggestionDebounce) {
 				clearTimeout(suggestionDebounce);
 				suggestionDebounce = null;
 			}
 			aiSuggestions = [];
-			suggestionSource = 'newton';
+			suggestionSource = reasoningModel;
 			suggestionSignature = '';
 			return;
 		}
-		if (sig === suggestionSignature && aiSuggestions) return;
+		if (key === suggestionSignature && aiSuggestions) return;
 		suggestionSource = 'loading';
 		if (suggestionDebounce || suggestionFetchInFlight) return;
 		suggestionDebounce = setTimeout(() => {
@@ -406,6 +424,8 @@
 				stageNames={STAGE_META}
 				{aiSuggestions}
 				source={suggestionSource}
+				model={reasoningModel}
+				onModelChange={handleModelChange}
 			/>
 		</section>
 	</main>

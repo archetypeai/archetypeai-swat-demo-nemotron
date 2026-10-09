@@ -2,7 +2,7 @@
   import { ToggleGroup as ToggleGroupPrimitive } from 'bits-ui';
   import { getToggleGroupCtx } from './toggle-group.svelte';
   import { cn } from '$lib/utils.js';
-  import { toggleVariants } from '@atai/ds-ui-svelte/atai/primitives/toggle/index.js';
+  import { toggleVariants } from '$lib/components/ui/primitives/toggle/index.js';
 
   let {
     ref = $bindable(null),

@@ -20,11 +20,11 @@ export async function fetchProjections() {
 	return res.json();
 }
 
-export async function fetchSuggestions(stageStatuses, stageSensors = {}) {
+export async function fetchSuggestions(stageStatuses, stageSensors = {}, model = 'nemotron') {
 	const res = await fetch('/api/suggestions', {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ stageStatuses, stageSensors })
+		body: JSON.stringify({ stageStatuses, stageSensors, model })
 	});
 	if (!res.ok) throw new Error('Suggestions failed');
 	return res.json();

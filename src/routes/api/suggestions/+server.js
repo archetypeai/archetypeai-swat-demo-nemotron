@@ -2,7 +2,7 @@ import { json } from '@sveltejs/kit';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { queryNemotron } from '$lib/server/nemotron.js';
-import { STAGE_COLUMNS } from '$lib/server/newton.js';
+import { STAGE_COLUMNS, queryNewton } from '$lib/server/newton.js';
 
 // Authoritative topology. All Nemotron-generated suggestions are validated
 // against this table — any suggestion whose (origin, direction) doesn't map
@@ -95,7 +95,7 @@ Rules:
 - For upstream/downstream cards, any valve or pump you tell the operator to act on MUST belong to the TARGET stage (see "Equipment by stage"). You may cite the anomalous stage's sensor reading as evidence, but never name its valves or pumps (MV*, P*) in an upstream/downstream card. Example, P2 anomaly, upstream card, target P1: "FIT201=0.00 vs normal 1.12 — hold feed at P1, check P101 and MV101".
 - Keep each "text" field under 140 characters, imperative voice, concrete verbs ("reduce", "check", "isolate", "alert").`;
 
-// In-memory cache keyed by anomaly signature (e.g. "P1,P4"). Cleared on server restart.
+// In-memory cache keyed by model + anomaly signature (e.g. "nemotron:P1,P4"). Cleared on server restart.
 const cache = new Map();
 
 const STAGE_NAMES = {
@@ -201,10 +201,17 @@ function parseSuggestions(text) {
 	}
 }
 
+// Same prompt, parser and validation for both reasoning models; only the call differs.
+const MODELS = {
+	nemotron: (query) => queryNemotron({ query, systemPrompt: SYSTEM_PROMPT, maxTokens: 1500 }),
+	newton: (query) => queryNewton({ query, systemPrompt: SYSTEM_PROMPT, maxNewTokens: 1500 })
+};
+
 export async function POST({ request }) {
 	try {
-		const { stageStatuses, stageSensors = {} } = await request.json();
+		const { stageStatuses, stageSensors = {}, model = 'nemotron' } = await request.json();
 		if (!stageStatuses) return json({ error: 'Missing stageStatuses' }, { status: 400 });
+		if (!MODELS[model]) return json({ error: `Unknown model: ${model}` }, { status: 400 });
 
 		const anomalous = ['P1', 'P2', 'P3', 'P4', 'P5', 'P6']
 			.filter((id) => stageStatuses[id] === 'attack')
@@ -212,32 +219,30 @@ export async function POST({ request }) {
 		const signature = anomalous.join(',') || 'none';
 
 		if (anomalous.length === 0) {
-			return json({ suggestions: [], source: 'nemotron', signature });
+			return json({ suggestions: [], source: model, model, signature });
 		}
 
-		if (cache.has(signature)) {
-			return json({ suggestions: cache.get(signature), source: 'nemotron-cached', signature });
+		const key = `${model}:${signature}`;
+		if (cache.has(key)) {
+			return json({ suggestions: cache.get(key), source: `${model}-cached`, model, signature });
 		}
 
-		const raw = await queryNemotron({
-			query: buildQuery(stageStatuses, stageSensors),
-			systemPrompt: SYSTEM_PROMPT,
-			maxTokens: 1500
-		});
+		const raw = await MODELS[model](buildQuery(stageStatuses, stageSensors));
 		const parsed = parseSuggestions(raw);
 
 		if (!parsed || parsed.length === 0) {
 			return json({
 				suggestions: [],
 				source: 'error',
+				model,
 				signature,
-				error: 'Nemotron response did not parse or all suggestions failed topology check',
+				error: `${model} response did not parse or all suggestions failed topology check`,
 				raw
 			});
 		}
 
-		cache.set(signature, parsed);
-		return json({ suggestions: parsed, source: 'nemotron', signature });
+		cache.set(key, parsed);
+		return json({ suggestions: parsed, source: model, model, signature });
 	} catch (err) {
 		return json({ error: err.message, source: 'error' }, { status: 500 });
 	}

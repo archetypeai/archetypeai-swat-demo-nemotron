@@ -9,7 +9,7 @@ SWaT water-treatment demo pairing **Archetype AI Newton Omega** with **NVIDIA Ne
 
 Forked from [`archetypeai-swat-demo-direct-query`](https://github.com/archetypeai/archetypeai-swat-demo-direct-query). Classification is unchanged; what changed is the reasoning step:
 
-- `/api/suggestions` calls Nemotron (`src/lib/server/nemotron.js`) instead of Newton C 2.6.
+- `/api/suggestions` calls Nemotron (`src/lib/server/nemotron.js`) by default. A **Nemotron / Newton C** toggle in the Suggested actions panel switches to Newton C 2.6 (the parent's model) for side-by-side comparison — same prompt, parser and validation for both.
 - Every model call is server-side. The parent's browser-direct suggestions path (which sent the Archetype API key to the browser via `/api/baselines`) is removed.
 - Nemotron gets every stage's equipment list, and upstream/downstream cards that name the anomalous stage's own valves or pumps are dropped (see [Phase 3](#phase-3--reason-suggested-actions-via-nvidia-nemotron)).
 
@@ -162,7 +162,8 @@ Browser                    SvelteKit /api/suggestions               NVIDIA integ
 ```
 
 - **Request:** `model: nvidia/nemotron-3-super-120b-a12b`, `temperature: 0.2`, and `chat_template_kwargs: { enable_thinking: false }` to turn off Nemotron 3's reasoning trace (`/no_think` in the prompt is ignored by Nemotron 3). About 1.5 s for a new anomaly set.
-- **Cache:** results are cached in memory per anomaly signature (e.g. `P2,P3`), so a repeat of the same set returns instantly with `source: nemotron-cached`.
+- **Model toggle:** the panel's **Nemotron / Newton C** toggle sends `model: "nemotron"` (default) or `model: "newton"` in the request; `newton` calls `Newton::c2_6_8b_fp8_260424d7a55d5e` on `/query` with the same system prompt in `instruction_prompt`. Switching clears the cards and refetches immediately. Measured on the same P2 + P3 snapshot: Nemotron ~2.6 s, Newton C 2.6 ~7 s, both 6/6 valid cards.
+- **Cache:** results are cached in memory per model + anomaly signature (e.g. `nemotron:P2,P3`), so a repeat — or switching back to a model already asked — returns instantly with `source: nemotron-cached` / `newton-cached`.
 - **Validation:** each card's (origin, direction) must map to the expected target stage, and an upstream/downstream card may cite the anomalous stage's readings as evidence but not tell the operator to act on its valves (`MV…`) or pumps (`P…`) — those belong on the local card.
 
 ### Inside the Omega Direct Query call
@@ -183,10 +184,11 @@ Per the Omega skill's recommended convention, each window is embedded **one requ
 }
 ```
 
-The app uses two models:
+The app uses three models:
 
 - **`OmegaEncoder::omega_embeddings_1_4`** on Archetype's `/query` endpoint for per-window classification embeddings. Picked over `omega_embeddings_01` after a side-by-side leave-one-out comparison: P1 93→98%, P3 93→97%, no regressions on the other stages.
-- **NVIDIA Nemotron** (`NEMOTRON_MODEL`, default `nvidia/nemotron-3-super-120b-a12b`) via `https://integrate.api.nvidia.com/v1` — for operator-suggestion JSON.
+- **NVIDIA Nemotron** (`NEMOTRON_MODEL`, default `nvidia/nemotron-3-super-120b-a12b`) via `https://integrate.api.nvidia.com/v1` — for operator-suggestion JSON (default).
+- **`Newton::c2_6_8b_fp8_260424d7a55d5e`** (Newton C 2.6) on Archetype's `/query`, called with `instruction_prompt` only — the alternative behind the panel toggle.
 
 `scripts/compare_omega_models.py` re-runs the Omega encoder comparison on your own setup. (`scripts/compare-newton-models.js` is inherited from the parent repo and compares Newton C checkpoints on the suggestions prompt; it doesn't cover Nemotron.)
 
