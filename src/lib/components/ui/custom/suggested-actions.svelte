@@ -97,8 +97,8 @@
 				onValueChange={(v) => v && onModelChange?.(v)}
 				aria-label="Reasoning model"
 			>
-				<ToggleGroup.Item value="nemotron" class="font-mono text-[10px] data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">Nemotron</ToggleGroup.Item>
-				<ToggleGroup.Item value="newton" class="font-mono text-[10px] data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">Newton C</ToggleGroup.Item>
+				<ToggleGroup.Item value="nemotron" class="font-mono text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">Nemotron</ToggleGroup.Item>
+				<ToggleGroup.Item value="newton" class="font-mono text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">Newton C</ToggleGroup.Item>
 			</ToggleGroup.Root>
 		</div>
 	</header>
