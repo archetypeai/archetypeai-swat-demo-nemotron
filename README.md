@@ -9,7 +9,7 @@ SWaT water-treatment demo pairing **Archetype AI Newton Omega** with **NVIDIA Ne
 
 Forked from [`archetypeai-swat-demo-direct-query`](https://github.com/archetypeai/archetypeai-swat-demo-direct-query). Classification is unchanged; what changed is the reasoning step:
 
-- `/api/suggestions` calls Nemotron (`src/lib/server/nemotron.js`) by default. Newton C 2.6 (the parent's model) is called **in parallel** with Nemotron for every anomaly set, and a **Nemotron / Newton C** toggle in the Suggested actions panel switches between the two results, each labelled with its response time — same prompt, parser and validation for both.
+- `/api/suggestions` calls Nemotron (`src/lib/server/nemotron.js`) by default. Newton C 2.6 (the parent's model) is called **in parallel** with Nemotron for every anomaly set, and a **Nemotron / Newton C** toggle in the Suggested actions panel switches between the two results — same prompt, parser and validation for both.
 - Every model call is server-side. The parent's browser-direct suggestions path (which sent the Archetype API key to the browser via `/api/baselines`) is removed.
 - Nemotron gets every stage's equipment list, and upstream/downstream cards that name the anomalous stage's own valves or pumps are dropped (see [Phase 3](#phase-3--reason-suggested-actions-via-nvidia-nemotron)).
 
@@ -163,7 +163,7 @@ Browser                    SvelteKit /api/suggestions               NVIDIA integ
 
 - **Request:** `model: nvidia/nemotron-3-super-120b-a12b`, `temperature: 0.2`, and `chat_template_kwargs: { enable_thinking: false }` to turn off Nemotron 3's reasoning trace (`/no_think` in the prompt is ignored by Nemotron 3). About 1.5 s for a new anomaly set.
 - **Both models, in parallel:** when the anomaly set changes, the page sends two requests at once — `model: "nemotron"` and `model: "newton"` (`Newton::c2_6_8b_fp8_260424d7a55d5e` on `/query`, same system prompt in `instruction_prompt`). Each result is kept separately; the panel's **Nemotron / Newton C** toggle only switches which one is shown (Nemotron by default), so switching is instant and never refetches.
-- **Timing:** the server measures each model call alone (just before the call to the reply, excluding parsing and the browser hop) and returns it as `latency_ms`; the toggle shows it per model, e.g. `Nemotron 2.4 s · Newton C 5.1 s`. A cached answer keeps the latency of the call that produced it. Measured on the P2 + P3 replay: Nemotron ~2.3–2.6 s, Newton C 2.6 ~3.5–7 s, both 6/6 valid cards.
+- **Timing (API only, not shown in the UI):** the server measures each model call alone (just before the call to the reply, excluding parsing and the browser hop) and returns it as `latency_ms`; a cached answer keeps the latency of the call that produced it. Measured on the P2 + P3 replay: Nemotron ~2.3–2.6 s, Newton C 2.6 ~3.5–7 s, both 6/6 valid cards.
 - **Cache:** results are cached in memory per model + anomaly signature (e.g. `nemotron:P2,P3`), so a repeat — or switching back to a model already asked — returns instantly with `source: nemotron-cached` / `newton-cached`.
 - **Validation:** each card's (origin, direction) must map to the expected target stage, and an upstream/downstream card may cite the anomalous stage's readings as evidence but not tell the operator to act on its valves (`MV…`) or pumps (`P…`) — those belong on the local card.
 

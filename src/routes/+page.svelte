@@ -93,15 +93,10 @@
 	// Suggested Actions are fetched from BOTH reasoning models in parallel for every anomaly set;
 	// the panel toggle only chooses which result to show (NVIDIA Nemotron by default).
 	const REASONING_MODELS = ['nemotron', 'newton'];
-	const blankResult = (source = 'loading') => ({ suggestions: null, source, latencyMs: null, signature: '' });
+	const blankResult = (source = 'loading') => ({ suggestions: null, source, signature: '' });
 	let byModel = $state({ nemotron: blankResult(), newton: blankResult() });
 	let reasoningModel = $state('nemotron');
 	let shown = $derived(byModel[reasoningModel]);
-	let modelStatus = $derived(
-		Object.fromEntries(
-			REASONING_MODELS.map((m) => [m, { source: byModel[m].source, latencyMs: byModel[m].latencyMs }])
-		)
-	);
 	let suggestionDebounce = null;
 	const suggestionInFlight = { nemotron: false, newton: false };
 
@@ -296,12 +291,11 @@
 			byModel[model] = {
 				suggestions: result.suggestions ?? [],
 				source: result.source ?? 'error',
-				latencyMs: result.latency_ms ?? null,
 				signature: sig
 			};
 		} catch (err) {
 			console.error(`[suggestions:${model}] failed:`, err);
-			byModel[model] = { suggestions: [], source: 'error', latencyMs: null, signature: sig };
+			byModel[model] = { suggestions: [], source: 'error', signature: sig };
 		} finally {
 			suggestionInFlight[model] = false;
 			// The anomaly set moved on while this call was out — ask again for the new set.
@@ -328,7 +322,7 @@
 			if (suggestionDebounce) return;
 			suggestionDebounce = setTimeout(() => {
 				suggestionDebounce = null;
-				// Both models at once, so their timings are comparable.
+				// Both models at once, so either result is ready when the toggle switches.
 				for (const m of REASONING_MODELS) runSuggestionsFetch(m);
 			}, ANOMALY_DEBOUNCE_MS);
 		});
@@ -425,7 +419,6 @@
 				aiSuggestions={shown.suggestions}
 				source={shown.source}
 				model={reasoningModel}
-				{modelStatus}
 				onModelChange={handleModelChange}
 			/>
 		</section>
