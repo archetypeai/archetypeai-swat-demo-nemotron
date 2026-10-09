@@ -1,5 +1,5 @@
 <script>
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import { cn } from '$lib/utils.js';
 	import Menubar from '$lib/components/ui/patterns/menubar/index.js';
 	import Button from '$lib/components/ui/primitives/button/index.js';
@@ -90,13 +90,20 @@
 	// Gate P6 classification on activity. P6 is the backwash loop — when FIT601 ≈ 0
 	// the stage is idle/standby and classification is essentially noise.
 	const P6_ACTIVITY_THRESHOLD = 0.01;
-	let aiSuggestions = $state(null);
-	let suggestionSource = $state('loading');
-	let suggestionSignature = $state('');
-	let suggestionDebounce = null;
-	let suggestionFetchInFlight = false;
-	// Reasoning model for Suggested Actions: NVIDIA Nemotron (default) or Newton C 2.6.
+	// Suggested Actions are fetched from BOTH reasoning models in parallel for every anomaly set;
+	// the panel toggle only chooses which result to show (NVIDIA Nemotron by default).
+	const REASONING_MODELS = ['nemotron', 'newton'];
+	const blankResult = (source = 'loading') => ({ suggestions: null, source, latencyMs: null, signature: '' });
+	let byModel = $state({ nemotron: blankResult(), newton: blankResult() });
 	let reasoningModel = $state('nemotron');
+	let shown = $derived(byModel[reasoningModel]);
+	let modelStatus = $derived(
+		Object.fromEntries(
+			REASONING_MODELS.map((m) => [m, { source: byModel[m].source, latencyMs: byModel[m].latencyMs }])
+		)
+	);
+	let suggestionDebounce = null;
+	const suggestionInFlight = { nemotron: false, newton: false };
 
 	let effectiveStatuses = $derived.by(() => {
 		const out = { ...stageStatuses };
@@ -255,83 +262,76 @@
 			.join(',');
 	});
 
-	// What the current cards were generated for: model + anomaly set.
-	let suggestionKey = $derived(anomalySignature ? `${reasoningModel}:${anomalySignature}` : '');
-
 	function handleModelChange(model) {
-		if (!model || model === reasoningModel) return;
-		reasoningModel = model;
-		aiSuggestions = null; // don't show the other model's cards under this model's label
-		if (suggestionDebounce) {
-			clearTimeout(suggestionDebounce);
-			suggestionDebounce = null;
-		}
-		if (anomalySignature) runSuggestionsFetch();
+		if (model && REASONING_MODELS.includes(model)) reasoningModel = model;
 	}
 
-	async function runSuggestionsFetch() {
-		if (suggestionFetchInFlight) return;
-		const key = suggestionKey;
-		const model = reasoningModel;
-		if (!anomalySignature) return;
-		suggestionFetchInFlight = true;
-		suggestionSource = 'loading';
-
+	function currentStageSensors() {
 		const stageSensors = {};
-		if (liveRow) {
-			for (const stageId of STAGE_IDS) {
-				if (effectiveStatuses[stageId] !== 'attack') continue;
-				const sensors = {};
-				for (const col of STAGE_COLUMNS[stageId]) sensors[col] = liveRow[col];
-				stageSensors[stageId] = sensors;
-			}
+		if (!liveRow) return stageSensors;
+		for (const stageId of STAGE_IDS) {
+			if (effectiveStatuses[stageId] !== 'attack') continue;
+			const sensors = {};
+			for (const col of STAGE_COLUMNS[stageId]) sensors[col] = liveRow[col];
+			stageSensors[stageId] = sensors;
 		}
+		return stageSensors;
+	}
+
+	async function runSuggestionsFetch(model) {
+		if (suggestionInFlight[model]) return;
+		const sig = anomalySignature;
+		if (!sig) return;
+		suggestionInFlight[model] = true;
+		byModel[model] = { ...blankResult(), signature: byModel[model].signature };
 
 		const timeoutPromise = new Promise((_, reject) =>
 			setTimeout(() => reject(new Error('Client timeout: 150s exceeded')), 150000)
 		);
-
 		try {
 			const result = await Promise.race([
-				fetchSuggestions(effectiveStatuses, stageSensors, model),
+				fetchSuggestions(effectiveStatuses, currentStageSensors(), model),
 				timeoutPromise
 			]);
-			aiSuggestions = result.suggestions ?? [];
-			suggestionSource = result.source ?? 'error';
-			suggestionSignature = key;
+			byModel[model] = {
+				suggestions: result.suggestions ?? [],
+				source: result.source ?? 'error',
+				latencyMs: result.latency_ms ?? null,
+				signature: sig
+			};
 		} catch (err) {
-			console.error('[suggestions] failed:', err);
-			aiSuggestions = [];
-			suggestionSource = 'error';
-			suggestionSignature = key;
+			console.error(`[suggestions:${model}] failed:`, err);
+			byModel[model] = { suggestions: [], source: 'error', latencyMs: null, signature: sig };
 		} finally {
-			suggestionFetchInFlight = false;
-			if (suggestionKey && suggestionKey !== suggestionSignature) {
-				runSuggestionsFetch();
+			suggestionInFlight[model] = false;
+			// The anomaly set moved on while this call was out — ask again for the new set.
+			if (anomalySignature && anomalySignature !== byModel[model].signature) {
+				runSuggestionsFetch(model);
 			}
 		}
 	}
 
 	$effect(() => {
 		const sig = anomalySignature;
-		const key = suggestionKey;
-		if (!sig) {
-			if (suggestionDebounce) {
-				clearTimeout(suggestionDebounce);
-				suggestionDebounce = null;
+		untrack(() => {
+			if (!sig) {
+				if (suggestionDebounce) {
+					clearTimeout(suggestionDebounce);
+					suggestionDebounce = null;
+				}
+				for (const m of REASONING_MODELS) byModel[m] = { ...blankResult(m), suggestions: [] };
+				return;
 			}
-			aiSuggestions = [];
-			suggestionSource = reasoningModel;
-			suggestionSignature = '';
-			return;
-		}
-		if (key === suggestionSignature && aiSuggestions) return;
-		suggestionSource = 'loading';
-		if (suggestionDebounce || suggestionFetchInFlight) return;
-		suggestionDebounce = setTimeout(() => {
-			suggestionDebounce = null;
-			runSuggestionsFetch();
-		}, ANOMALY_DEBOUNCE_MS);
+			const stale = REASONING_MODELS.filter((m) => byModel[m].signature !== sig);
+			if (stale.length === 0) return;
+			for (const m of stale) byModel[m] = { ...blankResult(), signature: byModel[m].signature };
+			if (suggestionDebounce) return;
+			suggestionDebounce = setTimeout(() => {
+				suggestionDebounce = null;
+				// Both models at once, so their timings are comparable.
+				for (const m of REASONING_MODELS) runSuggestionsFetch(m);
+			}, ANOMALY_DEBOUNCE_MS);
+		});
 	});
 </script>
 
@@ -422,9 +422,10 @@
 			<SuggestedActions
 				stageStatuses={effectiveStatuses}
 				stageNames={STAGE_META}
-				{aiSuggestions}
-				source={suggestionSource}
+				aiSuggestions={shown.suggestions}
+				source={shown.source}
 				model={reasoningModel}
+				{modelStatus}
 				onModelChange={handleModelChange}
 			/>
 		</section>

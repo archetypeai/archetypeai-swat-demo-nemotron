@@ -24,6 +24,7 @@
 	 * @property {'nemotron'|'nemotron-cached'|'newton'|'newton-cached'|'loading'|'error'} [source]
 	 * @property {'nemotron'|'newton'} [model] - reasoning model currently selected
 	 * @property {(model: 'nemotron'|'newton') => void} [onModelChange]
+	 * @property {Record<string, {source: string, latencyMs: number|null}>} [modelStatus] - per-model status for the toggle
 	 * @property {string} [class]
 	 */
 
@@ -35,6 +36,7 @@
 		source = 'loading',
 		model = 'nemotron',
 		onModelChange,
+		modelStatus = {},
 		class: className,
 		...restProps
 	} = $props();
@@ -59,6 +61,12 @@
 			error: `${modelName} unavailable`
 		}[source] ?? ''
 	);
+	// Model time as measured on the server for the call that produced the result.
+	function timing(status) {
+		if (!status || status.source === 'loading') return '…';
+		if (status.source === 'error') return 'failed';
+		return status.latencyMs == null ? '' : `${(status.latencyMs / 1000).toFixed(1)} s`;
+	}
 	const SOURCE_TONE = {
 		nemotron: 'text-atai-good',
 		'nemotron-cached': 'text-atai-good',
@@ -83,8 +91,10 @@
 				{suggestions.length} active · {anomalous.length} stage{anomalous.length === 1 ? '' : 's'}
 			</span>
 		</div>
-		<div class="flex items-center justify-between gap-2">
-			<span class={cn('font-mono text-[10px] uppercase tracking-wider', SOURCE_TONE[source])}>
+		<div class="flex flex-wrap items-center justify-between gap-2">
+			<span
+				class={cn('font-mono text-[10px] whitespace-nowrap uppercase tracking-wider', SOURCE_TONE[source])}
+			>
 				{sourceLabel}
 			</span>
 			<ToggleGroup.Root
@@ -95,8 +105,8 @@
 				onValueChange={(v) => v && onModelChange?.(v)}
 				aria-label="Reasoning model"
 			>
-				<ToggleGroup.Item value="nemotron" class="font-mono text-[10px] data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">Nemotron</ToggleGroup.Item>
-				<ToggleGroup.Item value="newton" class="font-mono text-[10px] data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">Newton C</ToggleGroup.Item>
+				<ToggleGroup.Item value="nemotron" class="font-mono text-[10px] data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">Nemotron <span class="tabular-nums opacity-70">{timing(modelStatus.nemotron)}</span></ToggleGroup.Item>
+				<ToggleGroup.Item value="newton" class="font-mono text-[10px] data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">Newton C <span class="tabular-nums opacity-70">{timing(modelStatus.newton)}</span></ToggleGroup.Item>
 			</ToggleGroup.Root>
 		</div>
 	</header>

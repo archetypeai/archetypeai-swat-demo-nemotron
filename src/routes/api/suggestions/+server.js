@@ -219,15 +219,20 @@ export async function POST({ request }) {
 		const signature = anomalous.join(',') || 'none';
 
 		if (anomalous.length === 0) {
-			return json({ suggestions: [], source: model, model, signature });
+			return json({ suggestions: [], source: model, model, signature, latency_ms: null });
 		}
 
 		const key = `${model}:${signature}`;
 		if (cache.has(key)) {
-			return json({ suggestions: cache.get(key), source: `${model}-cached`, model, signature });
+			// A cached answer keeps the latency of the call that produced it.
+			const hit = cache.get(key);
+			return json({ ...hit, source: `${model}-cached`, model, signature });
 		}
 
+		// Model time only: from just before the call to the reply, excluding parsing and the browser hop.
+		const started = performance.now();
 		const raw = await MODELS[model](buildQuery(stageStatuses, stageSensors));
+		const latency_ms = Math.round(performance.now() - started);
 		const parsed = parseSuggestions(raw);
 
 		if (!parsed || parsed.length === 0) {
@@ -236,13 +241,14 @@ export async function POST({ request }) {
 				source: 'error',
 				model,
 				signature,
+				latency_ms,
 				error: `${model} response did not parse or all suggestions failed topology check`,
 				raw
 			});
 		}
 
-		cache.set(key, parsed);
-		return json({ suggestions: parsed, source: model, model, signature });
+		cache.set(key, { suggestions: parsed, latency_ms });
+		return json({ suggestions: parsed, source: model, model, signature, latency_ms });
 	} catch (err) {
 		return json({ error: err.message, source: 'error' }, { status: 500 });
 	}
