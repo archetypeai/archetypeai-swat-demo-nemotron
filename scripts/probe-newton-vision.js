@@ -19,7 +19,7 @@ function loadEnv() {
 }
 
 const ENV = loadEnv();
-const BASE = ENV.ATAI_API_ENDPOINT.replace(/\/$/, '') + '/v0.5';
+const BASE = ENV.ATAI_API_ENDPOINT.replace(/\/$/, '') + '/api';
 const NEWTON_MODEL = 'Newton::c2_4_7b_251215a172f6d7';
 
 async function uploadFile(path, mime) {
@@ -42,9 +42,9 @@ async function uploadFile(path, mime) {
 }
 
 async function postQuery(body, label) {
-	console.log(`\n[${label}] POST ${BASE}/query`);
+	console.log(`\n[${label}] POST ${BASE}/lens/query`);
 	const t0 = Date.now();
-	const res = await fetch(`${BASE}/query`, {
+	const res = await fetch(`${BASE}/lens/query`, {
 		method: 'POST',
 		headers: {
 			Authorization: `Bearer ${ENV.ATAI_API_KEY}`,

@@ -109,7 +109,7 @@ function parseSuggestions(text) {
 
 async function runOnce(env, model) {
 	const t0 = Date.now();
-	const res = await fetch(env.ATAI_API_ENDPOINT.replace(/\/$/, '') + '/v0.5/query', {
+	const res = await fetch(env.ATAI_API_ENDPOINT.replace(/\/$/, '') + '/api/lens/query', {
 		method: 'POST',
 		headers: {
 			Authorization: `Bearer ${env.ATAI_API_KEY}`,

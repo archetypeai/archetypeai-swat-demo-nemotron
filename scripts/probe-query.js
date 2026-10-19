@@ -62,7 +62,7 @@ Generate suggestions for ATTACK stages only. For each suggestion, cite the speci
 
 async function main() {
 	const env = loadEnv();
-	const endpoint = env.ATAI_API_ENDPOINT.replace(/\/$/, '') + '/v0.5/query';
+	const endpoint = env.ATAI_API_ENDPOINT.replace(/\/$/, '') + '/api/lens/query';
 	const body = {
 		query: QUERY,
 		system_prompt: SYSTEM_PROMPT,

@@ -3,7 +3,9 @@ import { readFileSync, existsSync } from 'fs';
 import { resolve } from 'path';
 import { projectEmbedding } from './projections.js';
 
-const API_VERSION = 'v0.5';
+// Every API surface lives under one versionless /api prefix, and the Direct
+// Query endpoint keeps its lens/ namespace.
+const API_PREFIX = 'api';
 const OMEGA_MODEL = 'OmegaEncoder::omega_embeddings_1_4';
 
 // SWaT stage → sensor column mapping. Identical to the original Lens-based demo
@@ -30,7 +32,7 @@ export const DEFAULT_CONFIG = {
 };
 
 function apiUrl(path) {
-	return `${ATAI_API_ENDPOINT.replace(/\/$/, '')}/${API_VERSION}${path}`;
+	return `${ATAI_API_ENDPOINT.replace(/\/$/, '')}/${API_PREFIX}${path}`;
 }
 
 // ──────────────────────────────────────────────────────────────────────
@@ -115,7 +117,7 @@ async function postQuery(body, timeoutMs = OMEGA_TIMEOUT_MS) {
 	const controller = new AbortController();
 	const t = setTimeout(() => controller.abort(), timeoutMs);
 	try {
-		const res = await fetch(apiUrl('/query'), {
+		const res = await fetch(apiUrl('/lens/query'), {
 			method: 'POST',
 			headers: {
 				Authorization: `Bearer ${ATAI_API_KEY}`,
@@ -320,7 +322,7 @@ export async function queryNewton({ query, systemPrompt = '', maxNewTokens = 102
 	const controller = new AbortController();
 	const timeoutId = setTimeout(() => controller.abort(), 120000);
 	try {
-		const res = await fetch(apiUrl('/query'), {
+		const res = await fetch(apiUrl('/lens/query'), {
 			method: 'POST',
 			headers: {
 				Authorization: `Bearer ${ATAI_API_KEY}`,

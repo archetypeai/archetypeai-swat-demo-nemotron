@@ -103,7 +103,7 @@ scripts/build-knn-library.js
    ├── read data/swat_attack.csv (2,000 rows from attack periods)
    ├── for each stage (P1..P6):
    │     for each window (128 rows, step=20):
-   │         for each channel:  POST /v0.5/query { model: OmegaEncoder, events: [data.numeric_array (ONE channel)] }   (parallel)
+   │         for each channel:  POST /api/lens/query { model: OmegaEncoder, events: [data.numeric_array (ONE channel)] }   (parallel)
    │         ← flat 768-d vector per channel
    │         concat in channel order → [num_channels × 768] vector, label NORMAL or ATTACK
    │

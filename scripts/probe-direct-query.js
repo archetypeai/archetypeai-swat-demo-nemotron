@@ -21,7 +21,7 @@ function loadEnv() {
 }
 
 const ENV = loadEnv();
-const ENDPOINT = ENV.ATAI_API_ENDPOINT.replace(/\/$/, '') + '/v0.5/query';
+const ENDPOINT = ENV.ATAI_API_ENDPOINT.replace(/\/$/, '') + '/api/lens/query';
 const MODEL = 'OmegaEncoder::omega_embeddings_01';
 
 const WINDOW_SIZE = 128;
