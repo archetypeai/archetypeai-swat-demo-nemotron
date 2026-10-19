@@ -39,7 +39,7 @@ function arg(name, def) {
 }
 
 const env = loadEnv();
-const ENDPOINT = env.ATAI_API_ENDPOINT.replace(/\/$/, '') + '/v0.5/query';
+const ENDPOINT = env.ATAI_API_ENDPOINT.replace(/\/$/, '') + '/api/lens/query';
 const KEY = env.ATAI_API_KEY;
 const row = arg('row', 20000);
 const timeoutMs = arg('timeout', 15000);

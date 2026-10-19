@@ -182,7 +182,7 @@ async function buildForStage(stageId, csvSets, headerIdxByLabel, endpoint, apiKe
 async function main() {
 	const env = loadEnv();
 	const args = parseArgs();
-	const endpoint = env.ATAI_API_ENDPOINT.replace(/\/$/, '') + '/v0.5/query';
+	const endpoint = env.ATAI_API_ENDPOINT.replace(/\/$/, '') + '/api/lens/query';
 	console.log(`Endpoint: ${endpoint}`);
 	console.log(`Window: ${args.window}, Step: ${args.step}`);
 

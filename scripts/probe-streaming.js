@@ -10,7 +10,9 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
 const LENS_PREFIX = 'swat-probe';
-const API_VERSION = 'v0.5';
+// Every API surface lives under one versionless /api prefix, and the Direct
+// Query endpoint keeps its lens/ namespace.
+const API_PREFIX = 'api';
 
 const STAGE_COLUMNS = {
 	P1: ['FIT101', 'LIT101', 'MV101', 'P101'],
@@ -44,7 +46,7 @@ const API_BASE = ENV.ATAI_API_ENDPOINT.replace(/\/$/, '');
 const API_KEY = ENV.ATAI_API_KEY;
 
 function apiUrl(path) {
-	return `${API_BASE}/${API_VERSION}${path}`;
+	return `${API_BASE}/${API_PREFIX}${path}`;
 }
 
 async function apiGet(path) {

@@ -15,7 +15,7 @@ seconds.  This script extracts them and averages across N runs per model:
 
 Usage:
     export ATAI_API_KEY=...
-    export ATAI_API_ENDPOINT=https://api.u1.archetypeai.app/
+    export ATAI_API_ENDPOINT=https://platform.u1.archetypeai.app
     python compare_omega_models.py --iterations 5 --channels 4 --window 128
 
 Optional:
@@ -97,7 +97,7 @@ def make_random_window(channels: int, window: int, seed: int = 42) -> list[list[
 def post_query(
     endpoint: str, api_key: str, model: str, contents: list[list[float]]
 ) -> tuple[int, dict[str, Any], float]:
-    url = endpoint.rstrip("/") + "/v0.5/query"
+    url = endpoint.rstrip("/") + "/api/lens/query"
     body = {
         "query": "",
         "model": model,

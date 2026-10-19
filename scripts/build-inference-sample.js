@@ -147,7 +147,7 @@ function flatten2D(arr) {
 async function main() {
 	const env = loadEnv();
 	const args = parseArgs();
-	const endpoint = env.ATAI_API_ENDPOINT.replace(/\/$/, '') + '/v0.5/query';
+	const endpoint = env.ATAI_API_ENDPOINT.replace(/\/$/, '') + '/api/lens/query';
 	console.log(`Endpoint: ${endpoint}`);
 	console.log(`Offset ${args.offset}, slice ${args.rows} rows, window=${args.window}, step=${args.step}`);
 
