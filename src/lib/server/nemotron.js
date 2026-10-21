@@ -2,7 +2,7 @@ import { env } from '$env/dynamic/private';
 
 // NVIDIA's hosted API (build.nvidia.com) — OpenAI-compatible chat completions.
 const DEFAULT_ENDPOINT = 'https://integrate.api.nvidia.com/v1';
-const DEFAULT_MODEL = 'nvidia/nemotron-3-super-120b-a12b';
+const DEFAULT_MODEL = 'nvidia/nemotron-3-ultra-550b-a55b';
 
 export function nemotronModel() {
 	return env.NEMOTRON_MODEL || DEFAULT_MODEL;

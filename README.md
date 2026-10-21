@@ -5,7 +5,7 @@
 SWaT water-treatment demo pairing **Archetype AI Newton Omega** with **NVIDIA Nemotron**:
 
 - **Sensing — Newton Omega** (Archetype Direct Query API, `OmegaEncoder::omega_embeddings_1_4`): per-channel embeddings + local KNN classify each of the six stages as normal / attack in real time.
-- **Reasoning — NVIDIA Nemotron** (NVIDIA hosted API, `integrate.api.nvidia.com`, default `nvidia/nemotron-3-super-120b-a12b`): when stages flag, Nemotron gets the stage states plus live sensor values vs. baseline and returns topology-checked upstream / local / downstream operator suggestions.
+- **Reasoning — NVIDIA Nemotron** (NVIDIA hosted API, `integrate.api.nvidia.com`, default `nvidia/nemotron-3-ultra-550b-a55b`): when stages flag, Nemotron gets the stage states plus live sensor values vs. baseline and returns topology-checked upstream / local / downstream operator suggestions.
 
 Forked from [`archetypeai-swat-demo-direct-query`](https://github.com/archetypeai/archetypeai-swat-demo-direct-query). Classification is unchanged; what changed is the reasoning step:
 
@@ -38,7 +38,7 @@ cp .env.example .env
 # NVIDIA_API_KEY: create one at https://build.nvidia.com/settings/api-keys (free
 # NVIDIA Developer Program). An NGC key used for pulling containers also starts with
 # nvapi- but gets 403 on the hosted models.
-# Optional: NEMOTRON_MODEL (default nvidia/nemotron-3-super-120b-a12b), NVIDIA_API_ENDPOINT.
+# Optional: NEMOTRON_MODEL (default nvidia/nemotron-3-ultra-550b-a55b), NVIDIA_API_ENDPOINT.
 
 npm install
 
@@ -163,7 +163,7 @@ Browser                    SvelteKit /api/suggestions               NVIDIA integ
    │◀──── { suggestions, source } │    the anomalous stage's valves/pumps    │
 ```
 
-- **Request:** `model: nvidia/nemotron-3-super-120b-a12b`, `temperature: 0.2`, and `chat_template_kwargs: { enable_thinking: false }` to turn off Nemotron 3's reasoning trace (`/no_think` in the prompt is ignored by Nemotron 3). About 1.5 s for a new anomaly set.
+- **Request:** `model: nvidia/nemotron-3-ultra-550b-a55b`, `temperature: 0.2`, and `chat_template_kwargs: { enable_thinking: false }` to turn off Nemotron 3's reasoning trace (`/no_think` in the prompt is ignored by Nemotron 3). About 1.5 s for a new anomaly set.
 - **Both models, in parallel:** when the anomaly set changes, the page sends two requests at once — `model: "nemotron"` and `model: "newton"` (`Newton::c2_6_8b_fp8_260424d7a55d5e` on `/query`, same system prompt in `instruction_prompt`). Each result is kept separately; the panel's **Nemotron / Newton C** toggle only switches which one is shown (Nemotron by default), so switching is instant and never refetches.
 - **Timing (API only, not shown in the UI):** the server measures each model call alone (just before the call to the reply, excluding parsing and the browser hop) and returns it as `latency_ms`; a cached answer keeps the latency of the call that produced it. Measured on the P2 + P3 replay: Nemotron ~2.3–2.6 s, Newton C 2.6 ~3.5–7 s, both 6/6 valid cards.
 - **Cache:** results are cached in memory per model + anomaly signature (e.g. `nemotron:P2,P3`), so a repeat — or switching back to a model already asked — returns instantly with `source: nemotron-cached` / `newton-cached`.
@@ -190,7 +190,7 @@ Per the Omega skill's recommended convention, each window is embedded **one requ
 The app uses three models:
 
 - **`OmegaEncoder::omega_embeddings_1_4`** on Archetype's `/query` endpoint for per-window classification embeddings. Picked over `omega_embeddings_01` after a side-by-side leave-one-out comparison: P1 93→98%, P3 93→97%, no regressions on the other stages.
-- **NVIDIA Nemotron** (`NEMOTRON_MODEL`, default `nvidia/nemotron-3-super-120b-a12b`) via `https://integrate.api.nvidia.com/v1` — for operator-suggestion JSON (default).
+- **NVIDIA Nemotron** (`NEMOTRON_MODEL`, default `nvidia/nemotron-3-ultra-550b-a55b`) via `https://integrate.api.nvidia.com/v1` — for operator-suggestion JSON (default).
 - **`Newton::c2_6_8b_fp8_260424d7a55d5e`** (Newton C 2.6) on Archetype's `/query`, called with `instruction_prompt` only — the alternative behind the panel toggle.
 
 `scripts/compare_omega_models.py` re-runs the Omega encoder comparison on your own setup. (`scripts/compare-newton-models.js` is inherited from the parent repo and compares Newton C checkpoints on the suggestions prompt; it doesn't cover Nemotron.)
