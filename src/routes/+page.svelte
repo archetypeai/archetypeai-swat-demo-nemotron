@@ -12,6 +12,7 @@
 	import PlaybackControls from '$lib/components/ui/custom/playback-controls.svelte';
 	import PlantSchematic from '$lib/components/ui/custom/plant-schematic.svelte';
 	import EmbeddingPanel from '$lib/components/ui/custom/embedding-panel.svelte';
+	import HowItWorks from '$lib/components/ui/custom/how-it-works.svelte';
 	import { fetchChunk, classifyWindow, fetchProjections, fetchSuggestions } from '$lib/api/swat.js';
 
 	// Mirrors src/lib/server/newton.js STAGE_COLUMNS; kept in sync manually.
@@ -329,7 +330,7 @@
 	});
 </script>
 
-<svelte:head><title>Newton Omega × NVIDIA Nemotron · SWaT</title></svelte:head>
+<svelte:head><title>Newton × NVIDIA Nemotron · SWaT</title></svelte:head>
 
 <a
 	href="#main-content"
@@ -340,7 +341,7 @@
 
 {#snippet partnerSnippet()}
 	<span class="text-muted-foreground font-mono text-sm tracking-wider uppercase">
-		SWaT · Omega × NVIDIA Nemotron · 6-stage water treatment
+		SWaT · Newton × NVIDIA Nemotron · 6-stage water treatment
 	</span>
 {/snippet}
 
@@ -348,12 +349,13 @@
 	class="bg-background text-foreground flex min-h-screen flex-col"
 >
 	<Menubar partnerLogo={partnerSnippet}>
+		<HowItWorks />
 		{#if sessionStatus === 'ready'}
 			<Badge
 				variant="outline"
 				class={cn('font-mono', classifyErrors.length ? 'text-atai-warning' : 'text-atai-good')}
 			>
-				Omega · Direct Query{classifyInFlight ? ' · classifying' : ' · ready'}
+				Newton · Direct Query{classifyInFlight ? ' · classifying' : ' · ready'}
 			</Badge>
 			{#if classifyErrors.length}
 				<Badge variant="outline" class="text-atai-warning font-mono">

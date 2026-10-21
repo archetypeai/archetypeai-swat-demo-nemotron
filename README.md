@@ -66,6 +66,8 @@ Open the dev URL, press **Start analysis** (instant — no session warmup), then
 
 Three flows: **build** (offline, one-time), **classify** (per playback window), **reason** (when anomalies change).
 
+The **How it works** button in the menubar opens the same three flows as one diagram (`src/lib/components/ui/custom/how-it-works.svelte`).
+
 ### At a glance
 
 **Scaler phase (offline, one-time, `node scripts/build-scaler.js`):**
