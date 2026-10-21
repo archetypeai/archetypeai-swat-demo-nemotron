@@ -47,14 +47,14 @@
 	// gate by the current anomalous set to hide obsolete guidance.
 	let suggestions = $derived((aiSuggestions ?? []).filter((s) => anomalous.includes(s.origin)));
 
-	const MODEL_NAME = { nemotron: 'NVIDIA Nemotron', newton: 'Newton C 2.6' };
+	const MODEL_NAME = { nemotron: 'NVIDIA Nemotron', newton: 'Newton' };
 	let modelName = $derived(MODEL_NAME[model] ?? model);
 	let sourceLabel = $derived(
 		{
 			nemotron: 'NVIDIA Nemotron reasoning',
 			'nemotron-cached': 'NVIDIA Nemotron reasoning (cached)',
-			newton: 'Newton C 2.6 reasoning',
-			'newton-cached': 'Newton C 2.6 reasoning (cached)',
+			newton: 'Newton reasoning',
+			'newton-cached': 'Newton reasoning (cached)',
 			loading: `${modelName} analysing…`,
 			error: `${modelName} unavailable`
 		}[source] ?? ''
@@ -98,7 +98,7 @@
 				aria-label="Reasoning model"
 			>
 				<ToggleGroup.Item value="nemotron" class="font-mono text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">Nemotron</ToggleGroup.Item>
-				<ToggleGroup.Item value="newton" class="font-mono text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">Newton C</ToggleGroup.Item>
+				<ToggleGroup.Item value="newton" class="font-mono text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">Newton</ToggleGroup.Item>
 			</ToggleGroup.Root>
 		</div>
 	</header>
